@@ -1,71 +1,92 @@
 """
-ExecutionHarness - 默认执行 Harness
-
-用于执行一般性任务的 Harness 实现。
+Execution Harness - 使用 Agent Swarm 执行通用任务
 """
-import time
+import asyncio
 from datetime import datetime
+from typing import Dict, Any, Optional
+
+from src.core.types import Task, TaskResult, HarnessConfig, HarnessType, SwarmConfig, TaskStatus
+from src.core.exceptions import SwarmExecutionError
 from src.harness.base import BaseHarness
 from src.harness.factory import HarnessFactory
-from src.core.types import Task, TaskResult, HarnessType, TaskStatus
+from src.swarm_manager import SwarmManager
 
 
 class ExecutionHarness(BaseHarness):
-    """
-    执行 Harness
+    """执行 Harness - 使用 Agent Swarm 执行通用任务"""
 
-    默认的任务执行 Harness，用于执行一般性任务。
-    可以与 LLM 客户端集成来处理任务。
-    """
+    def __init__(self, config: HarnessConfig):
+        super().__init__(config)
+        self.swarm_manager: Optional[SwarmManager] = None
+        self.max_agents = config.custom_params.get("max_agents", 10)
 
     async def initialize(self):
-        """
-        初始化 ExecutionHarness
+        """初始化 Execution Harness，创建 SwarmManager"""
+        await super().initialize()
 
-        设置必要的资源，如 LLM 客户端连接等。
-        """
-        # 可以在这里初始化 LLM 客户端或其他资源
+        # 创建 Swarm 配置
+        swarm_config = SwarmConfig(
+            name=f"{self.harness_type.value}_swarm",
+            max_agents=self.max_agents,
+            enable_load_balancing=True,
+            enable_fault_tolerance=True,
+            message_queue_size=1000
+        )
+
+        # 创建并启动 SwarmManager
+        self.swarm_manager = SwarmManager(swarm_config)
+        await self.swarm_manager.start()
         self._initialized = True
 
     async def execute(self, task: Task) -> TaskResult:
-        """
-        执行任务
-
-        Args:
-            task: 要执行的任务
-
-        Returns:
-            TaskResult: 任务执行结果
-        """
-        start_time = time.time()
+        """使用 Swarm 执行任务"""
+        start_time = datetime.now()
 
         try:
             # 更新任务状态
             task.status = TaskStatus.IN_PROGRESS
 
-            # 这里可以集成 LLM 客户端来处理任务
-            # 简化实现：返回基本成功结果
-            output = {
-                "message": f"Task executed: {task.description}",
-                "harness": self.harness_type.value,
-                "task_type": task.task_type.value if task.task_type else "general"
-            }
+            # 提交任务到 Swarm
+            task_id = await self.swarm_manager.submit_task(
+                description=task.description,
+                task_type=task.task_type.value if task.task_type else "general",
+                requirements=task.requirements,
+                metadata=task.metadata
+            )
 
-            execution_time = time.time() - start_time
+            # 等待任务完成
+            swarm_result = await self.swarm_manager.wait_for_task(task_id)
 
+            execution_time = (datetime.now() - start_time).total_seconds()
+
+            # 检查是否出错
+            if "error" in swarm_result:
+                task.status = TaskStatus.FAILED
+                return TaskResult(
+                    task_id=task.task_id,
+                    status=TaskStatus.FAILED.value,
+                    output=None,
+                    quality_score=0.0,
+                    execution_time=execution_time,
+                    logs=[f"Swarm task {task_id} failed"],
+                    errors=[swarm_result.get("error", "Unknown error")],
+                    metadata={"swarm_task_id": task_id}
+                )
+
+            # 任务成功完成
             task.status = TaskStatus.COMPLETED
             task.completed_at = datetime.now()
 
+            # 构建 TaskResult
             return TaskResult(
                 task_id=task.task_id,
                 status=TaskStatus.COMPLETED.value,
-                output=output,
-                quality_score=1.0,
+                output=swarm_result.get("result", swarm_result),
+                quality_score=swarm_result.get("quality_score", 0.8),
                 execution_time=execution_time,
-                tokens_used=0,
-                logs=[f"Task {task.task_id} completed successfully"],
-                errors=[],
+                logs=[f"Swarm task {task_id} completed"],
                 metadata={
+                    "swarm_task_id": task_id,
                     "harness_type": self.harness_type.value,
                     "task_type": task.task_type.value if task.task_type else None
                 }
@@ -73,28 +94,25 @@ class ExecutionHarness(BaseHarness):
 
         except Exception as e:
             task.status = TaskStatus.FAILED
-            execution_time = time.time() - start_time
-
+            execution_time = (datetime.now() - start_time).total_seconds()
             return TaskResult(
                 task_id=task.task_id,
                 status=TaskStatus.FAILED.value,
                 output=None,
                 quality_score=0.0,
                 execution_time=execution_time,
-                tokens_used=0,
                 logs=[f"Task {task.task_id} failed"],
                 errors=[str(e)],
                 metadata={"harness_type": self.harness_type.value}
             )
 
     async def cleanup(self):
-        """
-        清理 ExecutionHarness 资源
-
-        释放 LLM 客户端连接等资源。
-        """
+        """清理 Swarm 资源"""
+        if self.swarm_manager:
+            await self.swarm_manager.stop()
+            self.swarm_manager = None
         self._initialized = False
 
 
-# 注册 ExecutionHarness
+# 注册到工厂
 HarnessFactory.register(HarnessType.EXECUTION, ExecutionHarness)

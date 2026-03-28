@@ -18,6 +18,21 @@ from src.harness.execution import ExecutionHarness
 from src.harness.factory import HarnessFactory
 
 
+@pytest.fixture
+def mock_swarm_manager():
+    """模拟 SwarmManager"""
+    mock = MagicMock()
+    mock.start = AsyncMock()
+    mock.stop = AsyncMock()
+    mock.submit_task = AsyncMock(return_value="swarm-task-456")
+    mock.wait_for_task = AsyncMock(return_value={
+        "status": "completed",
+        "result": {"message": "Task completed successfully"},
+        "quality_score": 0.85
+    })
+    return mock
+
+
 class TestMultiHarnessAgentSwarm:
     """MultiHarnessAgentSwarm 测试类"""
 
@@ -56,19 +71,20 @@ class TestMultiHarnessAgentSwarm:
         assert swarm.classifier is not None
 
     @pytest.mark.asyncio
-    async def test_process_request(self, swarm, mock_classification):
+    async def test_process_request(self, swarm, mock_classification, mock_swarm_manager):
         """测试处理请求"""
-        with patch.object(
-            swarm.classifier, 'classify', new_callable=AsyncMock
-        ) as mock_classify:
-            mock_classify.return_value = mock_classification
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            with patch.object(
+                swarm.classifier, 'classify', new_callable=AsyncMock
+            ) as mock_classify:
+                mock_classify.return_value = mock_classification
 
-            result = await swarm.process_request("Test input")
+                result = await swarm.process_request("Test input")
 
-            assert result["success"] is True
-            assert "task_id" in result
-            assert result["harness_type"] == HarnessType.EXECUTION.value
-            assert "result" in result
+                assert result["success"] is True
+                assert "task_id" in result
+                assert result["harness_type"] == HarnessType.EXECUTION.value
+                assert "result" in result
 
     @pytest.mark.asyncio
     async def test_process_request_error(self, swarm):
@@ -85,21 +101,22 @@ class TestMultiHarnessAgentSwarm:
             assert "Test error" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_process_with_confirmation_no_confirm(self, swarm, mock_classification):
+    async def test_process_with_confirmation_no_confirm(self, swarm, mock_classification, mock_swarm_manager):
         """测试处理无需确认的请求"""
-        with patch.object(
-            swarm.classifier, 'classify_with_confirmation', new_callable=AsyncMock
-        ) as mock_method:
-            mock_method.return_value = (mock_classification, None)
-
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
             with patch.object(
-                swarm.classifier, 'classify', new_callable=AsyncMock
-            ) as mock_classify:
-                mock_classify.return_value = mock_classification
+                swarm.classifier, 'classify_with_confirmation', new_callable=AsyncMock
+            ) as mock_method:
+                mock_method.return_value = (mock_classification, None)
 
-                result = await swarm.process_with_confirmation("Test input")
+                with patch.object(
+                    swarm.classifier, 'classify', new_callable=AsyncMock
+                ) as mock_classify:
+                    mock_classify.return_value = mock_classification
 
-                assert result["success"] is True
+                    result = await swarm.process_with_confirmation("Test input")
+
+                    assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_process_with_confirmation_needed(self, swarm, mock_classification):
@@ -124,20 +141,21 @@ class TestMultiHarnessAgentSwarm:
             assert "confirmation" in result
 
     @pytest.mark.asyncio
-    async def test_batch_process(self, swarm, mock_classification):
+    async def test_batch_process(self, swarm, mock_classification, mock_swarm_manager):
         """测试批量处理"""
         inputs = ["Task 1", "Task 2", "Task 3"]
 
-        with patch.object(
-            swarm.classifier, 'classify', new_callable=AsyncMock
-        ) as mock_classify:
-            mock_classify.return_value = mock_classification
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            with patch.object(
+                swarm.classifier, 'classify', new_callable=AsyncMock
+            ) as mock_classify:
+                mock_classify.return_value = mock_classification
 
-            results = await swarm.batch_process(inputs)
+                results = await swarm.batch_process(inputs)
 
-            assert len(results) == 3
-            for result in results:
-                assert result["success"] is True
+                assert len(results) == 3
+                for result in results:
+                    assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_get_classifier(self, swarm):
@@ -147,16 +165,17 @@ class TestMultiHarnessAgentSwarm:
         assert classifier == swarm.classifier
 
     @pytest.mark.asyncio
-    async def test_process_request_with_context(self, swarm, mock_classification):
+    async def test_process_request_with_context(self, swarm, mock_classification, mock_swarm_manager):
         """测试带上下文的请求处理"""
         context = {"user_id": "123", "session": "abc"}
 
-        with patch.object(
-            swarm.classifier, 'classify', new_callable=AsyncMock
-        ) as mock_classify:
-            mock_classify.return_value = mock_classification
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            with patch.object(
+                swarm.classifier, 'classify', new_callable=AsyncMock
+            ) as mock_classify:
+                mock_classify.return_value = mock_classification
 
-            result = await swarm.process_request("Test input", context)
+                result = await swarm.process_request("Test input", context)
 
-            assert result["success"] is True
-            mock_classify.assert_called_once_with("Test input", context)
+                assert result["success"] is True
+                mock_classify.assert_called_once_with("Test input", context)

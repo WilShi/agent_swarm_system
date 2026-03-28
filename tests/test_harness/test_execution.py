@@ -2,6 +2,7 @@
 ExecutionHarness 测试
 """
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 from src.harness.execution import ExecutionHarness
 from src.harness.factory import HarnessFactory
 from src.core.types import (
@@ -36,81 +37,155 @@ class TestExecutionHarness:
             task_type=TaskType.GENERAL
         )
 
+    @pytest.fixture
+    def mock_swarm_manager(self):
+        """模拟 SwarmManager"""
+        mock = AsyncMock()
+        mock.start = AsyncMock()
+        mock.stop = AsyncMock()
+        mock.submit_task = AsyncMock(return_value="swarm-task-456")
+        mock.wait_for_task = AsyncMock(return_value={
+            "status": "completed",
+            "result": {"message": "Task completed successfully"},
+            "quality_score": 0.85
+        })
+        return mock
+
     @pytest.mark.asyncio
-    async def test_initialize(self, execution_harness):
+    async def test_initialize(self, execution_harness, mock_swarm_manager):
         """测试初始化"""
-        await execution_harness.initialize()
-        assert execution_harness.is_initialized()
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
+            assert execution_harness.is_initialized()
+            assert execution_harness.swarm_manager is not None
+            mock_swarm_manager.start.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_execute(self, execution_harness, sample_task):
+    async def test_execute(self, execution_harness, sample_task, mock_swarm_manager):
         """测试执行"""
-        await execution_harness.initialize()
-        result = await execution_harness.execute(sample_task)
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
+            result = await execution_harness.execute(sample_task)
 
-        assert result.task_id == sample_task.task_id
-        assert result.status == TaskStatus.COMPLETED.value
-        assert result.output is not None
-        assert "message" in result.output
-        assert result.quality_score == 1.0
+            assert result.task_id == sample_task.task_id
+            assert result.status == TaskStatus.COMPLETED.value
+            assert result.output is not None
+            assert result.quality_score == 0.85
+            mock_swarm_manager.submit_task.assert_called_once()
+            mock_swarm_manager.wait_for_task.assert_called_once_with("swarm-task-456")
 
     @pytest.mark.asyncio
-    async def test_execute_updates_task_status(self, execution_harness, sample_task):
+    async def test_execute_updates_task_status(self, execution_harness, sample_task, mock_swarm_manager):
         """测试执行更新任务状态"""
-        await execution_harness.initialize()
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
 
-        assert sample_task.status == TaskStatus.PENDING
+            assert sample_task.status == TaskStatus.PENDING
 
-        await execution_harness.execute(sample_task)
+            await execution_harness.execute(sample_task)
 
-        assert sample_task.status == TaskStatus.COMPLETED
+            assert sample_task.status == TaskStatus.COMPLETED
 
     @pytest.mark.asyncio
-    async def test_cleanup(self, execution_harness):
+    async def test_execute_with_swarm_error(self, execution_harness, sample_task, mock_swarm_manager):
+        """测试 Swarm 返回错误时的处理"""
+        mock_swarm_manager.wait_for_task = AsyncMock(return_value={
+            "error": "Task execution failed"
+        })
+
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
+            result = await execution_harness.execute(sample_task)
+
+            assert result.status == TaskStatus.FAILED.value
+            assert result.errors == ["Task execution failed"]
+            assert result.quality_score == 0.0
+
+    @pytest.mark.asyncio
+    async def test_execute_with_exception(self, execution_harness, sample_task, mock_swarm_manager):
+        """测试执行抛出异常时的处理"""
+        mock_swarm_manager.submit_task = AsyncMock(side_effect=Exception("Connection error"))
+
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
+            result = await execution_harness.execute(sample_task)
+
+            assert result.status == TaskStatus.FAILED.value
+            assert "Connection error" in result.errors[0]
+            assert result.quality_score == 0.0
+
+    @pytest.mark.asyncio
+    async def test_cleanup(self, execution_harness, mock_swarm_manager):
         """测试清理"""
-        await execution_harness.initialize()
-        assert execution_harness.is_initialized()
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
+            assert execution_harness.is_initialized()
 
-        await execution_harness.cleanup()
-        assert not execution_harness.is_initialized()
+            await execution_harness.cleanup()
+            assert not execution_harness.is_initialized()
+            assert execution_harness.swarm_manager is None
+            mock_swarm_manager.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_run_full_cycle(self, execution_harness, sample_task):
+    async def test_run_full_cycle(self, execution_harness, sample_task, mock_swarm_manager):
         """测试完整的运行周期"""
-        result = await execution_harness.run(sample_task)
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            result = await execution_harness.run(sample_task)
 
-        assert result.task_id == sample_task.task_id
-        assert result.status == TaskStatus.COMPLETED.value
-        assert result.output is not None
-        assert result.execution_time > 0
+            assert result.task_id == sample_task.task_id
+            assert result.status == TaskStatus.COMPLETED.value
+            assert result.output is not None
+            assert result.execution_time > 0
 
     @pytest.mark.asyncio
-    async def test_run_already_initialized(self, execution_harness, sample_task):
+    async def test_run_already_initialized(self, execution_harness, sample_task, mock_swarm_manager):
         """测试已初始化时的运行"""
-        await execution_harness.initialize()
-        assert execution_harness.is_initialized()
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
+            assert execution_harness.is_initialized()
 
-        # 第二次运行不应重新初始化
-        result = await execution_harness.run(sample_task)
-        assert result.status == TaskStatus.COMPLETED.value
+            # 第二次运行不应重新初始化
+            result = await execution_harness.run(sample_task)
+            assert result.status == TaskStatus.COMPLETED.value
 
     def test_registration(self):
         """测试 ExecutionHarness 已注册"""
         assert HarnessFactory.is_registered(HarnessType.EXECUTION)
 
     @pytest.mark.asyncio
-    async def test_create_via_factory(self):
+    async def test_create_via_factory(self, mock_swarm_manager):
         """测试通过工厂创建"""
-        harness = HarnessFactory.create(HarnessType.EXECUTION)
-        assert isinstance(harness, ExecutionHarness)
-        assert harness.harness_type == HarnessType.EXECUTION
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            harness = HarnessFactory.create(HarnessType.EXECUTION)
+            assert isinstance(harness, ExecutionHarness)
+            assert harness.harness_type == HarnessType.EXECUTION
 
     @pytest.mark.asyncio
-    async def test_result_metadata(self, execution_harness, sample_task):
+    async def test_result_metadata(self, execution_harness, sample_task, mock_swarm_manager):
         """测试结果元数据"""
-        await execution_harness.initialize()
-        result = await execution_harness.execute(sample_task)
+        with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
+            await execution_harness.initialize()
+            result = await execution_harness.execute(sample_task)
 
-        assert result.metadata is not None
-        assert result.metadata["harness_type"] == HarnessType.EXECUTION.value
-        assert "task_type" in result.metadata
+            assert result.metadata is not None
+            assert result.metadata["harness_type"] == HarnessType.EXECUTION.value
+            assert "task_type" in result.metadata
+            assert "swarm_task_id" in result.metadata
+
+    @pytest.mark.asyncio
+    async def test_max_agents_config(self):
+        """测试 max_agents 配置"""
+        config = HarnessConfig(
+            harness_type=HarnessType.EXECUTION,
+            enabled=True,
+            timeout=300,
+            custom_params={"max_agents": 5}
+        )
+        harness = ExecutionHarness(config)
+        assert harness.max_agents == 5
+
+    @pytest.mark.asyncio
+    async def test_default_max_agents(self, harness_config):
+        """测试默认 max_agents 值"""
+        harness = ExecutionHarness(harness_config)
+        assert harness.max_agents == 10
