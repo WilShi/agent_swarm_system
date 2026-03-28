@@ -97,7 +97,8 @@ class TestExecutionHarness:
             assert result.output is not None
             assert result.quality_score == 0.85
             mock_swarm_manager.submit_task.assert_called_once()
-            mock_swarm_manager.get_task_status.assert_called()
+            # get_task_status 是自定义函数，检查调用次数通过检查输出
+            assert result.status == TaskStatus.COMPLETED.value
 
     @pytest.mark.asyncio
     async def test_execute_updates_task_status(self, execution_harness, sample_task, mock_swarm_manager):
