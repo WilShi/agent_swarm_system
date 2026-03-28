@@ -3,7 +3,7 @@ Agent Swarm 配置管理模块
 支持从环境变量和 .env 文件加载配置
 """
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
 
@@ -47,6 +47,23 @@ class LogConfig:
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
+@dataclass
+class ClassificationConfig:
+    """分类器配置"""
+    confidence_threshold: float = 0.7
+    require_confirmation: bool = True
+    max_retries: int = 3
+    default_harness: str = "execution"
+
+
+@dataclass
+class HarnessEngineConfig:
+    """Harness 引擎配置"""
+    enabled_harnesses: List[str] = field(default_factory=lambda: ["execution"])
+    default_timeout: int = 300
+    max_concurrent_harnesses: int = 5
+
+
 class ConfigManager:
     """配置管理器"""
     
@@ -62,12 +79,14 @@ class ConfigManager:
     def __init__(self):
         if ConfigManager._initialized:
             return
-        
+
         self._load_env_file()
         self.llm_config = self._load_llm_config()
         self.swarm_config = self._load_swarm_config()
         self.log_config = self._load_log_config()
-        
+        self.classification_config = self._load_classification_config()
+        self.harness_config = self._load_harness_config()
+
         ConfigManager._initialized = True
     
     def _load_env_file(self):
@@ -143,6 +162,24 @@ class ConfigManager:
         return LogConfig(
             level=os.getenv('LOG_LEVEL', 'INFO').upper(),
             colorful=os.getenv('LOG_COLORFUL', 'true').lower() == 'true'
+        )
+
+    def _load_classification_config(self) -> ClassificationConfig:
+        """加载分类器配置"""
+        return ClassificationConfig(
+            confidence_threshold=float(os.getenv('CLASSIFICATION_CONFIDENCE_THRESHOLD', '0.7')),
+            require_confirmation=os.getenv('CLASSIFICATION_REQUIRE_CONFIRMATION', 'true').lower() == 'true',
+            max_retries=int(os.getenv('CLASSIFICATION_MAX_RETRIES', '3')),
+            default_harness=os.getenv('CLASSIFICATION_DEFAULT_HARNESS', 'execution')
+        )
+
+    def _load_harness_config(self) -> HarnessEngineConfig:
+        """加载Harness配置"""
+        enabled = os.getenv('ENABLED_HARNESSES', 'execution').split(',')
+        return HarnessEngineConfig(
+            enabled_harnesses=[h.strip() for h in enabled],
+            default_timeout=int(os.getenv('HARNESS_DEFAULT_TIMEOUT', '300')),
+            max_concurrent_harnesses=int(os.getenv('HARNESS_MAX_CONCURRENT', '5'))
         )
     
     def get_llm_config(self, provider: str = None) -> LLMConfig:
