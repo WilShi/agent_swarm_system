@@ -5,6 +5,9 @@ Harness 模块
 - BaseHarness: Harness 抽象基类
 - HarnessFactory: Harness 工厂，用于创建 Harness 实例
 - ExecutionHarness: 默认执行 Harness 实现
+- CodeHarness: 代码相关任务 Harness
+- DebugHarness: 调试任务 Harness
+- ResearchHarness: 研究调研任务 Harness
 
 使用示例:
     from src.harness import HarnessFactory
@@ -21,6 +24,7 @@ from src.harness.factory import HarnessFactory
 from src.harness.execution import ExecutionHarness
 from src.harness.code import CodeHarness
 from src.harness.debug import DebugHarness
+from src.harness.research import ResearchHarness
 
 __all__ = [
     "BaseHarness",
@@ -28,6 +32,7 @@ __all__ = [
     "ExecutionHarness",
     "CodeHarness",
     "DebugHarness",
+    "ResearchHarness",
 ]
 
 # 版本信息
