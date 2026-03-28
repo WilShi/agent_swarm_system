@@ -54,8 +54,8 @@ class ExecutionHarness(BaseHarness):
                 metadata=task.metadata
             )
 
-            # 等待任务完成
-            swarm_result = await self.swarm_manager.wait_for_task(task_id)
+            # 等待任务完成（增加超时时间）
+            swarm_result = await self.swarm_manager.wait_for_task(task_id, timeout=180.0)
 
             execution_time = (datetime.now() - start_time).total_seconds()
 

@@ -459,5 +459,6 @@ class CoordinatorAgent(BaseAgent):
             "subtasks_count": len(task.subtasks),
             "completed_subtasks": sum(1 for s in task.subtasks if s.status == TaskStatus.COMPLETED),
             "failed_subtasks": sum(1 for s in task.subtasks if s.status == TaskStatus.FAILED),
-            "pending_subtasks": sum(1 for s in task.subtasks if s.status == TaskStatus.PENDING)
+            "pending_subtasks": sum(1 for s in task.subtasks if s.status == TaskStatus.PENDING),
+            "result": task.final_result
         }
