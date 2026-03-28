@@ -19,11 +19,13 @@ Harness 模块
 from src.harness.base import BaseHarness
 from src.harness.factory import HarnessFactory
 from src.harness.execution import ExecutionHarness
+from src.harness.code import CodeHarness
 
 __all__ = [
     "BaseHarness",
     "HarnessFactory",
     "ExecutionHarness",
+    "CodeHarness",
 ]
 
 # 版本信息
