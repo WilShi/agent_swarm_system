@@ -1,247 +1,348 @@
-# Agent Swarm System
+# Multi-Harness Agent Swarm System
 
-一个基于三层架构的多Agent协作系统，支持任务分解、分布式执行、结果验证和智能整合。
+一个智能的多 Harness 任务执行系统，能够自动识别任务类型并选择最优的执行模式。系统集成 Agent Swarm 架构，支持实时监控和交互式仪表板。
 
-## 架构概览
+[English](#english) | [中文](#中文)
+
+---
+
+<a name="中文"></a>
+## 中文介绍
+
+### 🎯 系统特点
+
+- **智能任务分类** - 自动识别任务类型（代码、调试、研究、测试等）
+- **多 Harness 支持** - 6 种专业 Harness 处理不同类型任务
+- **Agent Swarm 架构** - 三层架构（协调层/执行层/验证层）分布式任务处理
+- **实时监控** - 实时查看 Agent 工作状态和任务进度
+- **交互式仪表板** - 可视化监控界面，支持查看详情
+
+### 🏗️ 系统架构
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    第一层：协调/规划层                        │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  CoordinatorAgent (协调器)                          │   │
-│  │  - TaskDecomposer (任务分解器)                      │   │
-│  │  - ResourceAllocator (资源分配器)                   │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      第二层：执行层                          │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  ExecutorAgent(s) (执行器)                          │   │
-│  │  - ToolRegistry (工具注册表)                        │   │
-│  │  - ExecutionContext (执行上下文)                    │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    第三层：验证/整合层                        │
-│  ┌─────────────────┐    ┌─────────────────────────────┐   │
-│  │ ValidatorAgent  │    │ IntegratorAgent             │   │
-│  │ (验证器)        │    │ (整合器)                    │   │
-│  │ - 质量检查      │    │ - 结果整合                  │   │
-│  │ - 准确性验证    │    │ - 智能合并                  │   │
-│  └─────────────────┘    └─────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+用户请求 → TaskClassifier → HarnessFactory → 具体 Harness
+                                          ↓
+                              Execution/Code/Debug/Research/Test/ClaudeCode
+                                          ↓
+                              Agent Swarm (可选) / LLM 直接执行
+                                          ↓
+                              监控仪表板 (实时显示进度)
 ```
 
-## 核心特性
+### 📦 支持的 Harness
 
-### 1. 三层架构
-- **第一层（协调/规划层）**: 负责任务分解、资源分配、策略制定
-- **第二层（执行层）**: 负责具体任务执行、工具调用、数据处理
-- **第三层（验证/整合层）**: 负责结果验证、质量检查、最终整合
+| Harness | 功能 | 适用场景 |
+|---------|------|----------|
+| **ExecutionHarness** | 通用任务执行 | 标准任务处理，集成完整 Swarm |
+| **CodeHarness** | 代码生成与重构 | 生成函数/类、重构代码、优化性能 |
+| **DebugHarness** | 错误诊断修复 | 分析错误、定位问题、生成修复 |
+| **ResearchHarness** | 研究调研 | 信息搜索、知识综合、生成报告 |
+| **TestHarness** | 测试验证 | 生成测试用例、执行测试、分析覆盖率 |
+| **ClaudeCodeHarness** | 复杂多步骤任务 | 自动化工作流、计划执行、技能调用 |
 
-### 2. 任务分解策略
-- 分析类任务: 数据收集 → 预处理 → 分析执行 → 可视化
-- 生成类任务: 需求分析 → 内容生成 → 内容优化
-- 代码类任务: 需求理解 → 设计 → 实现 → 测试
-- 研究类任务: 文献检索 → 信息提取 → 知识综合
+### 🚀 快速开始
 
-### 3. 验证引擎
-- **完整性验证**: 检查必需字段和数据完整性
-- **准确性验证**: 验证结果准确性和模式匹配
-- **一致性验证**: 检查数据内部一致性
-- **性能验证**: 验证执行时间和资源使用
-- **格式验证**: 验证输出格式符合预期
-
-### 4. 整合策略
-- **合并 (Merge)**: 合并多个字典或列表
-- **连接 (Concatenate)**: 连接字符串或列表
-- **摘要 (Summarize)**: 生成统计摘要
-- **聚合 (Aggregate)**: 数值聚合计算
-- **选择最佳 (Select Best)**: 基于评分选择最优结果
-
-### 5. 通信机制
-- **消息总线**: 异步消息传递系统
-- **点对点通信**: Agent间直接通信
-- **广播**: 向所有Agent广播消息
-- **订阅模式**: 按消息类型订阅
-
-## 快速开始
-
-### 安装
+#### 安装
 
 ```bash
 # 克隆项目
-git clone <repository-url>
+git clone https://github.com/WilShi/agent_swarm_system.git
 cd agent_swarm_project
 
 # 安装依赖
 pip install -r requirements.txt
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，配置你的 Kimi K2.5 API 密钥
 ```
 
-### 基础使用
+#### 基本使用
 
 ```python
 import asyncio
-from src import create_swarm, run_task
+from src.harness import HarnessFactory
+from src.core.types import HarnessType, Task, TaskType
 
 async def main():
-    # 创建并启动Swarm
-    swarm = await create_swarm(name="MySwarm")
-    
-    try:
-        # 提交分析任务
-        result = await run_task(
-            swarm,
-            description="分析用户行为数据",
-            task_type="analysis",
-            wait=True,
-            timeout=30.0
-        )
-        print(f"任务结果: {result}")
-        
-        # 获取系统统计
-        stats = swarm.get_system_stats()
-        print(f"总Agent数: {stats['agents']['total']}")
-        
-    finally:
-        # 停止Swarm
-        await swarm.stop()
+    # 创建 Harness
+    harness = HarnessFactory.create(HarnessType.CODE)
 
-# 运行
+    # 创建任务
+    task = Task(
+        task_id="task-001",
+        description="生成一个Python函数来计算斐波那契数列",
+        task_type=TaskType.CODE,
+        harness_type=HarnessType.CODE
+    )
+
+    # 执行任务
+    result = await harness.run(task)
+
+    print(f"状态: {result.status}")
+    print(f"输出: {result.output}")
+
 asyncio.run(main())
 ```
 
-### 运行示例
+#### 使用 TaskClassifier 自动分类
 
-```bash
-# 基础示例
-python examples/basic_example.py
+```python
+from src.classifier import TaskClassifier
 
-# 高级示例
-python examples/advanced_example.py
+async def main():
+    classifier = TaskClassifier()
+
+    # 自动分类任务
+    result = await classifier.classify("帮我写个Python函数")
+
+    print(f"检测到的意图: {result.intent.primary_intent}")
+    print(f"推荐 Harness: {result.harness_type.value}")
+    print(f"置信度: {result.confidence:.2%}")
+
+asyncio.run(main())
 ```
 
-## 项目结构
+#### 使用监控仪表板
 
-```
-agent_swarm_project/
-├── src/
-│   ├── __init__.py
-│   ├── swarm_manager.py      # Swarm管理器
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── types.py          # 核心类型定义
-│   │   ├── base_agent.py     # Agent基类
-│   │   └── message_bus.py    # 消息总线
-│   └── layers/
-│       ├── __init__.py
-│       ├── coordinator_layer.py  # 协调层
-│       ├── execution_layer.py    # 执行层
-│       └── validation_layer.py   # 验证层
-├── examples/
-│   ├── __init__.py
-│   ├── basic_example.py      # 基础示例
-│   └── advanced_example.py   # 高级示例
-├── tests/
-│   ├── __init__.py
-│   ├── test_core.py          # 核心模块测试
-│   └── test_layers.py        # 层模块测试
-└── README.md
+```python
+# 启用监控仪表板
+harness = HarnessFactory.create(
+    HarnessType.EXECUTION,
+    config={
+        "custom_params": {
+            "enable_monitoring": True,
+            "show_dashboard": True  # 启动交互式仪表板
+        }
+    }
+)
 ```
 
-## 运行测试
+### 📊 监控功能
+
+系统提供完整的监控功能：
+
+- **Agent 监控** - 查看每个 Agent 的工作状态、进度、历史
+- **任务监控** - 跟踪任务执行阶段、子任务详情
+- **交互式仪表板** - 实时刷新、查看详情、操作控制
+
+```
+🤖 Agent Swarm 监控仪表板
+============================================================
+
+📊 整体进度
+   总任务: 4  |  ✓完成: 2  |  ✗失败: 0  |  🔄进行中: 2
+   [████████████████████░░░░░░░░░░] 50%
+
+──────────────────── 正在工作的 Agent ────────────────────
+
+  [1] Executor-2 (exec-002)
+      状态: 🟢 运行中  |  进度: [██████████░░░░] 60%
+      任务: data_preprocessing
+      耗时: 15.3秒
+
+操作: [w1]查看详情  [r]刷新  [q]退出
+```
+
+### 🧪 运行测试
 
 ```bash
 # 运行所有测试
 pytest tests/ -v
 
-# 运行特定测试
-pytest tests/test_core.py -v
-pytest tests/test_layers.py -v
+# 运行特定 Harness 测试
+pytest tests/test_harness/test_code.py -v
+
+# 运行监控演示
+python examples/monitor_demo.py
+
+# 运行带监控的任务执行
+python examples/execution_with_monitor.py --dashboard
 ```
 
-## 高级功能
+### 📁 项目结构
 
-### 自定义工具
+```
+agent_swarm_project/
+├── src/
+│   ├── core/              # 核心类型、配置、LLM客户端
+│   ├── classifier/        # 任务分类器
+│   ├── harness/           # 6种 Harness 实现
+│   ├── layers/            # Agent Swarm 三层架构
+│   ├── monitoring/        # 监控系统
+│   └── swarm_manager.py   # Swarm 管理器
+├── tests/                 # 测试套件（137+ 测试）
+├── examples/              # 使用示例
+├── config/                # 配置文件
+└── docs/                  # 设计文档
+```
+
+### 🔧 配置选项
+
+每个 Harness 支持多种配置选项：
 
 ```python
-async def my_custom_tool(data: dict) -> dict:
-    return {"processed": True, "data": data}
+# ExecutionHarness
+config = {
+    "max_agents": 10,              # 最大 Agent 数
+    "enable_monitoring": True,     # 启用监控
+    "show_dashboard": False        # 显示仪表板
+}
 
-# 注册到执行器
-executor.register_custom_tool(
-    "my_tool",
-    my_custom_tool,
-    "My custom tool",
-    {"data": "object"}
-)
+# CodeHarness
+config = {
+    "language": "python",          # 编程语言
+    "style_guide": "pep8"          # 代码风格
+}
+
+# ResearchHarness
+config = {
+    "max_sources": 10,             # 最大来源数
+    "research_depth": "deep",      # 研究深度
+    "output_format": "report"      # 输出格式
+}
 ```
 
-### 动态扩展Agent
+### 🛠️ 技术栈
 
-```python
-# 添加新的执行器
-new_agent_id = await swarm.add_executor(
-    capabilities=["custom_ml", "data_analysis"]
-)
+- **Python 3.11+** - 主语言
+- **asyncio** - 异步编程
+- **Kimi K2.5** (via DashScope) - LLM 引擎
+- **pytest** - 测试框架
+- **Agent Swarm** - 分布式任务处理
 
-# 移除执行器
-await swarm.remove_executor(new_agent_id)
-```
+### 📈 性能指标
 
-### 自定义验证策略
+- **测试覆盖率** - 137+ 测试用例
+- **Harness 数量** - 6 种专业 Harness
+- **Agent 并发** - 支持 10+ Agent 同时工作
+- **任务超时** - 可配置，默认 300 秒
 
-```python
-from src.layers import ValidationEngine
+### 🤝 贡献
 
-validator = ValidationEngine()
+欢迎提交 Issue 和 Pull Request！
 
-# 执行特定验证
-result = await validator.validate(
-    data=my_data,
-    validation_type="completeness",
-    criteria={"required_fields": ["name", "value"]}
-)
-```
-
-## 配置选项
-
-```python
-from src.core.types import SwarmConfig
-
-config = SwarmConfig(
-    name="MySwarm",
-    max_agents=20,
-    enable_load_balancing=True,
-    enable_fault_tolerance=True,
-    message_queue_size=2000
-)
-
-swarm = SwarmManager(config)
-```
-
-## Agent配置
-
-```python
-from src.core.types import AgentConfig, AgentRole
-
-config = AgentConfig(
-    name="MyAgent",
-    role=AgentRole.EXECUTOR,
-    capabilities=["coding", "testing"],
-    max_concurrent_tasks=5,
-    timeout_seconds=300
-)
-```
-
-## 许可证
+### 📄 许可证
 
 MIT License
 
-## 贡献
+---
 
-欢迎提交Issue和Pull Request！
+<a name="english"></a>
+## English Introduction
+
+### 🎯 Features
+
+- **Intelligent Task Classification** - Automatically identify task types (code, debug, research, test, etc.)
+- **Multi-Harness Support** - 6 specialized Harnesses for different task types
+- **Agent Swarm Architecture** - Three-layer architecture (Coordination/Execution/Validation)
+- **Real-time Monitoring** - View Agent working status and task progress in real-time
+- **Interactive Dashboard** - Visual monitoring interface with detail view
+
+### 🏗️ Architecture
+
+```
+User Request → TaskClassifier → HarnessFactory → Specific Harness
+                                            ↓
+                                Execution/Code/Debug/Research/Test/ClaudeCode
+                                            ↓
+                                Agent Swarm (optional) / LLM Direct Execution
+                                            ↓
+                                Monitor Dashboard (Real-time Progress)
+```
+
+### 📦 Supported Harnesses
+
+| Harness | Function | Use Case |
+|---------|----------|----------|
+| **ExecutionHarness** | General task execution | Standard tasks with full Swarm |
+| **CodeHarness** | Code generation & refactoring | Generate functions/classes, refactor, optimize |
+| **DebugHarness** | Error diagnosis & fixing | Analyze errors, locate issues, generate fixes |
+| **ResearchHarness** | Research & investigation | Info search, knowledge synthesis, reports |
+| **TestHarness** | Testing & validation | Generate tests, execute, analyze coverage |
+| **ClaudeCodeHarness** | Complex multi-step tasks | Automation workflows, plan execution |
+
+### 🚀 Quick Start
+
+#### Installation
+
+```bash
+# Clone project
+git clone https://github.com/WilShi/agent_swarm_system.git
+cd agent_swarm_project
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env file with your Kimi K2.5 API key
+```
+
+#### Basic Usage
+
+```python
+import asyncio
+from src.harness import HarnessFactory
+from src.core.types import HarnessType, Task, TaskType
+
+async def main():
+    # Create Harness
+    harness = HarnessFactory.create(HarnessType.CODE)
+
+    # Create task
+    task = Task(
+        task_id="task-001",
+        description="Generate a Python function to calculate Fibonacci sequence",
+        task_type=TaskType.CODE,
+        harness_type=HarnessType.CODE
+    )
+
+    # Execute task
+    result = await harness.run(task)
+
+    print(f"Status: {result.status}")
+    print(f"Output: {result.output}")
+
+asyncio.run(main())
+```
+
+### 🧪 Running Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run specific Harness tests
+pytest tests/test_harness/test_code.py -v
+
+# Run monitoring demo
+python examples/monitor_demo.py
+```
+
+### 🛠️ Tech Stack
+
+- **Python 3.11+** - Main language
+- **asyncio** - Async programming
+- **Kimi K2.5** (via DashScope) - LLM engine
+- **pytest** - Testing framework
+- **Agent Swarm** - Distributed task processing
+
+### 📈 Metrics
+
+- **Test Coverage** - 137+ test cases
+- **Harness Count** - 6 specialized Harnesses
+- **Agent Concurrency** - Support 10+ Agents simultaneously
+- **Task Timeout** - Configurable, default 300 seconds
+
+### 🤝 Contributing
+
+Issues and Pull Requests are welcome!
+
+### 📄 License
+
+MIT License
+
+---
+
+**Made with ❤️ by Wilson**
