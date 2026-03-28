@@ -45,15 +45,30 @@ class TestExecutionHarness:
         mock.stop = AsyncMock()
         mock.submit_task = AsyncMock(return_value="swarm-task-456")
         # _wait_with_progress 使用 get_task_status 而不是 wait_for_task
-        mock.get_task_status = AsyncMock(return_value={
-            "status": "completed",
-            "result": {"message": "Task completed successfully"},
-            "quality_score": 0.85,
-            "subtasks_count": 3,
-            "completed_subtasks": 3,
-            "failed_subtasks": 0,
-            "pending_subtasks": 0
-        })
+        # 使用 side_effect 来返回不同的值，第一次返回进行中，第二次返回完成
+        call_count = [0]
+        async def mock_get_task_status(task_id):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {
+                    "status": "in_progress",
+                    "result": None,
+                    "subtasks_count": 3,
+                    "completed_subtasks": 1,
+                    "failed_subtasks": 0,
+                    "pending_subtasks": 2
+                }
+            else:
+                return {
+                    "status": "completed",
+                    "result": {"message": "Task completed successfully"},
+                    "quality_score": 0.85,
+                    "subtasks_count": 3,
+                    "completed_subtasks": 3,
+                    "failed_subtasks": 0,
+                    "pending_subtasks": 0
+                }
+        mock.get_task_status = mock_get_task_status
         # 设置 executors, validators, integrators 为字典
         mock.executors = {}
         mock.validators = {}
@@ -100,7 +115,11 @@ class TestExecutionHarness:
     async def test_execute_with_swarm_error(self, execution_harness, sample_task, mock_swarm_manager):
         """测试 Swarm 返回错误时的处理"""
         mock_swarm_manager.get_task_status = AsyncMock(return_value={
-            "error": "Task execution failed"
+            "error": "Task execution failed",
+            "subtasks_count": 1,
+            "completed_subtasks": 0,
+            "failed_subtasks": 0,
+            "pending_subtasks": 1
         })
 
         with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
@@ -160,11 +179,15 @@ class TestExecutionHarness:
 
     def test_registration(self):
         """测试 ExecutionHarness 已注册"""
+        # 导入 ExecutionHarness 触发注册
+        from src.harness.execution import ExecutionHarness
         assert HarnessFactory.is_registered(HarnessType.EXECUTION)
 
     @pytest.mark.asyncio
     async def test_create_via_factory(self, mock_swarm_manager):
         """测试通过工厂创建"""
+        # 导入 ExecutionHarness 触发注册
+        from src.harness.execution import ExecutionHarness
         with patch('src.harness.execution.SwarmManager', return_value=mock_swarm_manager):
             harness = HarnessFactory.create(HarnessType.EXECUTION)
             assert isinstance(harness, ExecutionHarness)
