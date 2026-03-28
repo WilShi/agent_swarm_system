@@ -172,6 +172,14 @@ async def main():
         description="显示 Agent Swarm 系统信息"
     )
 
+    # interactive 命令
+    interactive_parser = subparsers.add_parser(
+        "interactive",
+        aliases=['i'],
+        help="启动交互式模式",
+        description="启动类似 ChatGPT 的交互式对话模式"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -292,6 +300,12 @@ async def main():
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """)
+
+    elif args.command in ["interactive", "i"]:
+        # 启动交互式模式
+        from src.interactive import InteractiveApp
+        app = InteractiveApp()
+        await app.run()
 
 
 if __name__ == "__main__":
