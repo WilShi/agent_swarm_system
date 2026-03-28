@@ -20,12 +20,14 @@ from src.harness.base import BaseHarness
 from src.harness.factory import HarnessFactory
 from src.harness.execution import ExecutionHarness
 from src.harness.code import CodeHarness
+from src.harness.debug import DebugHarness
 
 __all__ = [
     "BaseHarness",
     "HarnessFactory",
     "ExecutionHarness",
     "CodeHarness",
+    "DebugHarness",
 ]
 
 # 版本信息
