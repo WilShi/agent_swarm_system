@@ -187,7 +187,15 @@ class InteractiveApp:
             print("🔍 正在分析任务...")
             classification = await self.classifier.classify(text)
 
-            harness_type = self.current_harness or classification.harness_type.value
+            # 对于代码相关任务，强制使用 CodeHarness 避免 Swarm
+            if classification.task_type.value in ['code', 'generation'] or '写' in text or '生成' in text:
+                harness_type = 'code'
+            else:
+                harness_type = self.current_harness or classification.harness_type.value
+
+            # 如果还是 execution，改为 code（避免 Swarm）
+            if harness_type == 'execution':
+                harness_type = 'code'
 
             print(f"📊 分类结果: {classification.task_type.value} (置信度: {classification.confidence:.0%})")
             print(f"🚀 使用 Harness: {harness_type}")
