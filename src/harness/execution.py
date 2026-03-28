@@ -1,5 +1,6 @@
 """
 Execution Harness - 使用 Agent Swarm 执行通用任务
+集成监控系统，实时显示 Agent 工作状态
 """
 import asyncio
 from datetime import datetime
@@ -10,19 +11,35 @@ from src.core.exceptions import SwarmExecutionError
 from src.harness.base import BaseHarness
 from src.harness.factory import HarnessFactory
 from src.swarm_manager import SwarmManager
+from src.monitoring.agent_monitor import AgentMonitor, AgentStatus
+from src.monitoring.task_monitor import TaskMonitor, TaskStage
+from src.monitoring.dashboard import MonitorDashboard
 
 
 class ExecutionHarness(BaseHarness):
-    """执行 Harness - 使用 Agent Swarm 执行通用任务"""
+    """执行 Harness - 使用 Agent Swarm 执行通用任务，带监控"""
 
     def __init__(self, config: HarnessConfig):
         super().__init__(config)
         self.swarm_manager: Optional[SwarmManager] = None
         self.max_agents = config.custom_params.get("max_agents", 10)
+        self.enable_monitoring = config.custom_params.get("enable_monitoring", True)
+        self.show_dashboard = config.custom_params.get("show_dashboard", False)
+
+        # 监控器
+        self.agent_monitor: Optional[AgentMonitor] = None
+        self.task_monitor: Optional[TaskMonitor] = None
+        self.dashboard: Optional[MonitorDashboard] = None
 
     async def initialize(self):
-        """初始化 Execution Harness，创建 SwarmManager"""
+        """初始化 Execution Harness，创建 SwarmManager 和监控器"""
         await super().initialize()
+
+        # 创建监控器
+        if self.enable_monitoring:
+            self.agent_monitor = AgentMonitor()
+            self.task_monitor = TaskMonitor()
+            self.dashboard = MonitorDashboard(self.agent_monitor, self.task_monitor)
 
         # 创建 Swarm 配置
         swarm_config = SwarmConfig(
@@ -36,15 +53,66 @@ class ExecutionHarness(BaseHarness):
         # 创建并启动 SwarmManager
         self.swarm_manager = SwarmManager(swarm_config)
         await self.swarm_manager.start()
+
+        # 注册 Swarm 中的 Agents 到监控器
+        if self.enable_monitoring and self.swarm_manager:
+            await self._register_swarm_agents()
+
         self._initialized = True
 
+    async def _register_swarm_agents(self):
+        """注册 Swarm 中的 Agents 到监控器"""
+        if not self.agent_monitor or not self.swarm_manager:
+            return
+
+        # 注册 Coordinator
+        if self.swarm_manager.coordinator:
+            self.agent_monitor.register_agent(
+                self.swarm_manager.coordinator.config.agent_id,
+                self.swarm_manager.coordinator.config.name,
+                "coordinator"
+            )
+
+        # 注册 Executors
+        for agent_id, executor in self.swarm_manager.executors.items():
+            self.agent_monitor.register_agent(
+                agent_id,
+                executor.config.name,
+                "executor"
+            )
+
+        # 注册 Validators
+        for agent_id, validator in self.swarm_manager.validators.items():
+            self.agent_monitor.register_agent(
+                agent_id,
+                validator.config.name,
+                "validator"
+            )
+
+        # 注册 Integrators
+        for agent_id, integrator in self.swarm_manager.integrators.items():
+            self.agent_monitor.register_agent(
+                agent_id,
+                integrator.config.name,
+                "integrator"
+            )
+
     async def execute(self, task: Task, progress_callback=None) -> TaskResult:
-        """使用 Swarm 执行任务，带进度显示"""
+        """使用 Swarm 执行任务，集成监控"""
         start_time = datetime.now()
 
         try:
             # 更新任务状态
             task.status = TaskStatus.IN_PROGRESS
+
+            # 在监控器中注册任务
+            if self.task_monitor:
+                self.task_monitor.register_task(
+                    task.task_id,
+                    task.description,
+                    task.task_type.value if task.task_type else "general"
+                )
+                self.task_monitor.update_stage(task.task_id, TaskStage.EXECUTING)
 
             # 提交任务到 Swarm
             task_id = await self.swarm_manager.submit_task(
@@ -58,10 +126,27 @@ class ExecutionHarness(BaseHarness):
             print(f"   描述: {task.description}")
             print(f"   类型: {task.task_type.value if task.task_type else 'general'}")
 
+            # 启动监控仪表板（如果启用）
+            if self.show_dashboard and self.dashboard:
+                print("\n📊 启动监控仪表板...")
+                dashboard_task = asyncio.create_task(self.dashboard.run(task_id))
+
             # 等待任务完成，同时显示进度
             swarm_result = await self._wait_with_progress(task_id, timeout=300.0, progress_callback=progress_callback)
 
+            # 停止仪表板
+            if self.show_dashboard and self.dashboard:
+                self.dashboard._running = False
+                await asyncio.sleep(0.5)
+
             execution_time = (datetime.now() - start_time).total_seconds()
+
+            # 更新监控器状态
+            if self.task_monitor:
+                if "error" in swarm_result:
+                    self.task_monitor.update_stage(task.task_id, TaskStage.FAILED)
+                else:
+                    self.task_monitor.update_stage(task.task_id, TaskStage.COMPLETED)
 
             # 检查是否出错
             if "error" in swarm_result:
@@ -103,6 +188,8 @@ class ExecutionHarness(BaseHarness):
 
         except Exception as e:
             task.status = TaskStatus.FAILED
+            if self.task_monitor and task.task_id:
+                self.task_monitor.update_stage(task.task_id, TaskStage.FAILED)
             execution_time = (datetime.now() - start_time).total_seconds()
             return TaskResult(
                 task_id=task.task_id,
@@ -125,6 +212,7 @@ class ExecutionHarness(BaseHarness):
 
         start_time = datetime.now()
         last_status = None
+        dots = 0
 
         while True:
             # 获取当前状态
