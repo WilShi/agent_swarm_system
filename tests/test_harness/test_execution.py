@@ -44,11 +44,21 @@ class TestExecutionHarness:
         mock.start = AsyncMock()
         mock.stop = AsyncMock()
         mock.submit_task = AsyncMock(return_value="swarm-task-456")
-        mock.wait_for_task = AsyncMock(return_value={
+        # _wait_with_progress 使用 get_task_status 而不是 wait_for_task
+        mock.get_task_status = AsyncMock(return_value={
             "status": "completed",
             "result": {"message": "Task completed successfully"},
-            "quality_score": 0.85
+            "quality_score": 0.85,
+            "subtasks_count": 3,
+            "completed_subtasks": 3,
+            "failed_subtasks": 0,
+            "pending_subtasks": 0
         })
+        # 设置 executors, validators, integrators 为字典
+        mock.executors = {}
+        mock.validators = {}
+        mock.integrators = {}
+        mock.coordinator = None
         return mock
 
     @pytest.mark.asyncio
@@ -72,7 +82,7 @@ class TestExecutionHarness:
             assert result.output is not None
             assert result.quality_score == 0.85
             mock_swarm_manager.submit_task.assert_called_once()
-            mock_swarm_manager.wait_for_task.assert_called_once_with("swarm-task-456")
+            mock_swarm_manager.get_task_status.assert_called()
 
     @pytest.mark.asyncio
     async def test_execute_updates_task_status(self, execution_harness, sample_task, mock_swarm_manager):
@@ -89,7 +99,7 @@ class TestExecutionHarness:
     @pytest.mark.asyncio
     async def test_execute_with_swarm_error(self, execution_harness, sample_task, mock_swarm_manager):
         """测试 Swarm 返回错误时的处理"""
-        mock_swarm_manager.wait_for_task = AsyncMock(return_value={
+        mock_swarm_manager.get_task_status = AsyncMock(return_value={
             "error": "Task execution failed"
         })
 
