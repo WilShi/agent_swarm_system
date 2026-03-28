@@ -193,10 +193,17 @@ class InteractiveApp:
             print(f"🚀 使用 Harness: {harness_type}")
             print()
 
-            # 创建 Harness
+            # 创建 Harness（不使用 Swarm，直接使用 LLM）
             harness = create_harness(
                 harness_type,
-                config={"custom_params": {"enable_monitoring": True}}
+                config={
+                    "custom_params": {
+                        "enable_monitoring": False,  # 禁用监控，避免 Swarm
+                        "show_dashboard": False,
+                        "language": "python",
+                        "max_sources": 5
+                    }
+                }
             )
 
             # 创建任务
@@ -206,9 +213,15 @@ class InteractiveApp:
                 harness_type=HarnessType(harness_type)
             )
 
-            # 执行任务
-            print("⏳ 执行任务中...")
-            result = await harness.run(task)
+            # 执行任务（带超时）
+            print("⏳ 执行任务中... (按 Ctrl+C 中断)")
+            try:
+                result = await asyncio.wait_for(harness.run(task), timeout=60.0)
+            except asyncio.TimeoutError:
+                print("\n⚠️  任务执行超时 (60秒)")
+                print("💡 提示: 任务过于复杂，请尝试简化描述")
+                await harness.cleanup()
+                return
 
             # 显示结果
             print(f"\n✅ 任务完成！")
