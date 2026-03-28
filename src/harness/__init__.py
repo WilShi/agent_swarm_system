@@ -9,6 +9,7 @@ Harness 模块
 - DebugHarness: 调试任务 Harness
 - ResearchHarness: 研究调研任务 Harness
 - TestHarness: 测试验证和质量保证 Harness
+- ClaudeCodeHarness: 复杂多步骤任务和自动化工作流 Harness
 
 使用示例:
     from src.harness import HarnessFactory
@@ -27,6 +28,7 @@ from src.harness.code import CodeHarness
 from src.harness.debug import DebugHarness
 from src.harness.research import ResearchHarness
 from src.harness.test_harness import TestHarness
+from src.harness.claude_code import ClaudeCodeHarness
 
 __all__ = [
     "BaseHarness",
@@ -36,6 +38,7 @@ __all__ = [
     "DebugHarness",
     "ResearchHarness",
     "TestHarness",
+    "ClaudeCodeHarness",
 ]
 
 # 版本信息
