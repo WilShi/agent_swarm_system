@@ -328,15 +328,18 @@ class TestClaudeCodeHarness:
 
     def test_registration(self):
         """测试 ClaudeCodeHarness 已注册"""
-        # 导入触发注册
+        # 重新注册（其他测试可能已清理）
         from src.harness.claude_code import ClaudeCodeHarness
+        HarnessFactory.register(HarnessType.CLAUDE_CODE, ClaudeCodeHarness)
         assert HarnessFactory.is_registered(HarnessType.CLAUDE_CODE)
 
     @pytest.mark.asyncio
     async def test_create_via_factory(self):
         """测试通过工厂创建"""
-        # 导入触发注册
+        # 确保已注册
         from src.harness.claude_code import ClaudeCodeHarness
+        if not HarnessFactory.is_registered(HarnessType.CLAUDE_CODE):
+            HarnessFactory.register(HarnessType.CLAUDE_CODE, ClaudeCodeHarness)
         harness = HarnessFactory.create(HarnessType.CLAUDE_CODE)
         assert isinstance(harness, ClaudeCodeHarness)
         assert harness.harness_type == HarnessType.CLAUDE_CODE
