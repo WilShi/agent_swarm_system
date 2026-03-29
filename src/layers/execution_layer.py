@@ -467,6 +467,20 @@ class ExecutorAgent(BaseAgent):
 
         if action == "assign_task":
             subtask_data = content.get("subtask", {})
+            # 处理状态字符串转换
+            if "status" in subtask_data and isinstance(subtask_data["status"], str):
+                try:
+                    subtask_data["status"] = TaskStatus(subtask_data["status"])
+                except ValueError:
+                    subtask_data["status"] = TaskStatus.PENDING
+            # 处理 datetime 字符串
+            for field in ["created_at", "completed_at"]:
+                if field in subtask_data and isinstance(subtask_data[field], str):
+                    from datetime import datetime
+                    try:
+                        subtask_data[field] = datetime.fromisoformat(subtask_data[field])
+                    except:
+                        subtask_data[field] = None
             subtask = SubTask(**subtask_data)
             
             # 接受任务
