@@ -221,10 +221,22 @@ class InteractiveApp:
                 harness_type=HarnessType(harness_type)
             )
 
-            # 执行任务（带超时）
+            # 执行任务（带超时和进度显示）
             print("⏳ 执行任务中... (按 Ctrl+C 中断)")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+            # 创建进度显示任务
+            progress_task = asyncio.create_task(
+                self._show_progress(harness, task.task_id)
+            )
+
             try:
                 result = await asyncio.wait_for(harness.run(task), timeout=60.0)
+                progress_task.cancel()
+                try:
+                    await progress_task
+                except asyncio.CancelledError:
+                    pass
             except asyncio.TimeoutError:
                 print("\n⚠️  任务执行超时 (60秒)")
                 print("💡 提示: 任务过于复杂，请尝试简化描述")
@@ -399,6 +411,61 @@ class InteractiveApp:
             harness=self.current_harness or "auto (自动选择)",
             context_len=len(self.context)
         ))
+
+    async def _show_progress(self, harness, task_id: str):
+        """显示执行进度"""
+        import asyncio
+        from datetime import datetime
+
+        start_time = datetime.now()
+        last_status = None
+
+        while True:
+            try:
+                # 检查是否有监控器
+                if hasattr(harness, 'agent_monitor') and harness.agent_monitor:
+                    # 显示 Agent 状态
+                    working = harness.agent_monitor.get_working_agents()
+                    if working:
+                        print(f"\n🔄 正在工作的 Agent ({len(working)} 个):")
+                        for agent in working:
+                            print(f"  • {agent.agent_name}: {agent.task_type or 'N/A'} "
+                                  f"[{agent.progress:.0f}%] {agent.elapsed_time:.1f}s")
+
+                # 检查是否有任务监控器
+                if hasattr(harness, 'task_monitor') and harness.task_monitor:
+                    task_info = harness.task_monitor.get_task_info(task_id)
+                    if task_info and task_info.subtasks:
+                        total = len(task_info.subtasks)
+                        completed = sum(1 for s in task_info.subtasks if s.status == "completed")
+                        failed = sum(1 for s in task_info.subtasks if s.status == "failed")
+                        in_progress = sum(1 for s in task_info.subtasks if s.status == "in_progress")
+
+                        if total > 0:
+                            progress = (completed + failed) / total * 100
+                            print(f"\r  进度: [{completed}/{total}] {progress:.0f}% "
+                                  f"(✓{completed} ✗{failed} 🔄{in_progress})", end="", flush=True)
+
+                        # 显示子任务详情
+                        if task_info.subtasks and last_status != task_info.subtasks:
+                            print(f"\n📋 子任务:")
+                            for subtask in task_info.subtasks:
+                                status_icon = {
+                                    "pending": "⏳",
+                                    "in_progress": "🔄",
+                                    "completed": "✅",
+                                    "failed": "❌"
+                                }.get(subtask.status, "❓")
+                                print(f"  {status_icon} {subtask.task_type}: {subtask.description[:40]}...")
+                            last_status = task_info.subtasks
+
+                await asyncio.sleep(1.0)
+
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                # 忽略监控错误
+                await asyncio.sleep(1.0)
 
     async def _cmd_quit(self, args: List[str]):
         """退出"""

@@ -372,8 +372,18 @@ class CoordinatorAgent(BaseAgent):
                 self._validator_agents.append(agent_id)
             elif agent_role == "integrator":
                 self._integrator_agents.append(agent_id)
-            
+
             print(f"Registered {agent_role} agent: {agent_id}")
+
+            # 向 Agent 发送确认，告知 Coordinator ID
+            await self.send_to_agent(
+                agent_id,
+                {
+                    "action": "coordinator_assigned",
+                    "coordinator_id": self.config.agent_id
+                },
+                MessageType.COORDINATION
+            )
     
     async def _handle_task_result(self, message: Message):
         """处理任务结果"""

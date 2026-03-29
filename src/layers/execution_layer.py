@@ -160,10 +160,11 @@ class ExecutorAgent(BaseAgent):
     async def on_start(self):
         """启动执行器"""
         print(f"ExecutorAgent {self.config.agent_id} started")
-        
+
         # 注册消息处理器
         self.register_message_handler(MessageType.TASK_ASSIGN, self._handle_task_assign)
-        
+        self.register_message_handler(MessageType.COORDINATION, self._handle_coordination)
+
         # 向协调器注册
         await self._register_with_coordinator()
     
@@ -450,11 +451,20 @@ class ExecutorAgent(BaseAgent):
             "timestamp": datetime.now().isoformat()
         }
     
+    async def _handle_coordination(self, message: Message):
+        """处理协调消息"""
+        content = message.content
+        action = content.get("action")
+
+        if action == "coordinator_assigned":
+            self._coordinator_id = content.get("coordinator_id")
+            print(f"Coordinator assigned: {self._coordinator_id}")
+
     async def _handle_task_assign(self, message: Message):
         """处理任务分配消息"""
         content = message.content
         action = content.get("action")
-        
+
         if action == "assign_task":
             subtask_data = content.get("subtask", {})
             subtask = SubTask(**subtask_data)
